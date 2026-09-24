@@ -80,24 +80,16 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 3. BULK DELETE (SOFT OR HARD)
+// 3. BULK DELETE (PERMANENT HARD DELETE DARI MONGODB)
 router.delete('/bulk', async (req, res) => {
   try {
-    const { ids, isHardDelete } = req.body;
+    const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ status: 'error', message: 'Daftar ID transaksi tidak boleh kosong' });
     }
 
-    if (isHardDelete) {
-      await Transaction.deleteMany({ _id: { $in: ids } });
-      res.status(200).json({ status: 'success', message: `${ids.length} transaksi berhasil dihapus permanen` });
-    } else {
-      await Transaction.updateMany(
-        { _id: { $in: ids } }, 
-        { $set: { isDeleted: true, deletedAt: new Date() } }
-      );
-      res.status(200).json({ status: 'success', message: `${ids.length} transaksi berhasil dipindahkan ke sampah` });
-    }
+    await Transaction.deleteMany({ _id: { $in: ids } });
+    res.status(200).json({ status: 'success', message: `${ids.length} transaksi berhasil dihapus permanen dari database` });
   } catch (error) {
     console.error('Error bulk deleting transactions:', error);
     res.status(500).json({ status: 'error', message: error.message });
@@ -111,27 +103,33 @@ router.delete('/hard/:id', async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ status: 'error', message: 'Transaksi tidak ditemukan' });
     }
-    res.status(200).json({ status: 'success', message: 'Transaksi berhasil dihapus permanen' });
+    res.status(200).json({ status: 'success', message: 'Transaksi berhasil dihapus permanen dari database' });
   } catch (error) {
     console.error('Error hard deleting transaction:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
 
-// 5. SOFT DELETE (SATUAN)
+// 5. DELETE (SATUAN - PERMANENT HARD DELETE DARI MONGODB)
 router.delete('/:id', async (req, res) => {
   try {
-    const updatedTx = await Transaction.findByIdAndUpdate(
-      req.params.id, 
-      { isDeleted: true, deletedAt: new Date() }, 
-      { new: true }
-    );
-    if (!updatedTx) {
-      return res.status(404).json({ status: 'error', message: 'Transaksi tidak ditemukan' });
+    let deleted = null;
+    try {
+      deleted = await Transaction.findByIdAndDelete(req.params.id);
+    } catch (e) {
+      deleted = null;
     }
-    res.status(200).json({ status: 'success', data: updatedTx });
+
+    if (!deleted) {
+      deleted = await Transaction.findOneAndDelete({ _id: req.params.id });
+    }
+
+    if (!deleted) {
+      return res.status(404).json({ status: 'error', message: 'Transaksi tidak ditemukan di database' });
+    }
+    res.status(200).json({ status: 'success', message: 'Transaksi berhasil dihapus permanen dari database' });
   } catch (error) {
-    console.error('Error soft deleting transaction:', error);
+    console.error('Error deleting transaction:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 });

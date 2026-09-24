@@ -212,25 +212,28 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// 5. DELETE EXPENSE (SOFT DELETE)
+// 5. DELETE EXPENSE (PERMANENT HARD DELETE DARI DATABASE MONGODB)
 router.delete('/:id', async (req, res) => {
   try {
-    const { hard } = req.query;
-    if (hard === 'true') {
-      const deleted = await Expense.findByIdAndDelete(req.params.id);
-      if (!deleted) return res.status(404).json({ status: 'error', message: 'Data tidak ditemukan' });
-      return res.status(200).json({ status: 'success', message: 'Data pengeluaran dihapus permanen' });
+    let deleted = null;
+    try {
+      deleted = await Expense.findByIdAndDelete(req.params.id);
+    } catch (e) {
+      // If req.params.id is not a valid 24-hex ObjectId, try finding by custom id or string
+      deleted = null;
     }
 
-    const updated = await Expense.findByIdAndUpdate(
-      req.params.id, 
-      { isDeleted: true, deletedAt: new Date() }, 
-      { new: true }
-    );
-    if (!updated) {
-      return res.status(404).json({ status: 'error', message: 'Data tidak ditemukan' });
+    if (!deleted) {
+      deleted = await Expense.findOneAndDelete({ 
+        $or: [{ id: req.params.id }, { nama_item: req.params.id }] 
+      });
     }
-    res.status(200).json({ status: 'success', message: 'Data pengeluaran berhasil dihapus', data: updated });
+
+    if (!deleted) {
+      return res.status(404).json({ status: 'error', message: 'Data pengeluaran tidak ditemukan di database' });
+    }
+
+    res.status(200).json({ status: 'success', message: 'Data pengeluaran berhasil dihapus permanen dari database' });
   } catch (error) {
     console.error('Error deleting expense:', error);
     res.status(500).json({ status: 'error', message: error.message });
