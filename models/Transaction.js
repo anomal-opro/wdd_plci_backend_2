@@ -55,6 +55,15 @@ const transactionSchema = new mongoose.Schema({
   printCount: { 
     type: Number, 
     default: 0 
+  },
+  localId: {
+    type: String,
+    index: true,
+    sparse: true
+  },
+  deviceId: {
+    type: String,
+    default: null
   }
 }, { 
   timestamps: true 

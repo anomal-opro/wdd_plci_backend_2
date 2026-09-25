@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 2. CREATE / UPSERT TRANSACTION (SINGLE OR BULK WITH OVERRIDE SUPPORT)
+// 2. CREATE / UPSERT TRANSACTION (SINGLE OR BULK WITH OVERRIDE SUPPORT & IDEMPOTENCY)
 router.post('/', async (req, res) => {
   try {
     // A. Handle Array payload
@@ -51,6 +51,16 @@ router.post('/', async (req, res) => {
           const { overrideDbId, ...updateData } = item;
           const updated = await Transaction.findByIdAndUpdate(overrideDbId, updateData, { new: true, upsert: true });
           results.push(updated);
+        } else if (item.localId) {
+          // Idempotency: Jika transaksi dengan localId ini sudah ada di MongoDB, jangan buat duplikat!
+          const existing = await Transaction.findOne({ localId: item.localId });
+          if (existing) {
+            results.push(existing);
+          } else {
+            const newTx = new Transaction(item);
+            await newTx.save();
+            results.push(newTx);
+          }
         } else {
           const newTx = new Transaction(item);
           await newTx.save();
@@ -68,7 +78,15 @@ router.post('/', async (req, res) => {
       return res.status(200).json({ status: 'success', data: updated });
     }
 
-    // C. Standard Single Create
+    // C. Handle Single with localId (Idempotent Check)
+    if (req.body.localId) {
+      const existing = await Transaction.findOne({ localId: req.body.localId });
+      if (existing) {
+        return res.status(200).json({ status: 'success', data: existing, idempotent: true });
+      }
+    }
+
+    // D. Standard Single Create
     const txData = { ...req.body };
     if (!txData.sheet) txData.sheet = DEFAULT_SHEET;
     const newTransaction = new Transaction(txData);
