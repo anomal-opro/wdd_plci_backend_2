@@ -23,9 +23,21 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 2. CREATE MANUAL ACTIVITY LOG
+// 2. CREATE MANUAL ACTIVITY LOG (Supports single object or batch array)
 router.post('/', async (req, res) => {
   try {
+    if (Array.isArray(req.body)) {
+      if (req.body.length === 0) {
+        return res.status(200).json({ status: 'success', data: [] });
+      }
+      const logs = req.body.map(item => ({
+        ...item,
+        sheet: item.sheet || DEFAULT_SHEET
+      }));
+      const inserted = await ActivityLog.insertMany(logs);
+      return res.status(201).json({ status: 'success', data: inserted });
+    }
+
     const data = { ...req.body };
     if (!data.sheet) data.sheet = DEFAULT_SHEET;
     const newLog = new ActivityLog(data);
