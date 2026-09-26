@@ -44,15 +44,17 @@ router.post('/', async (req, res) => {
     // A. Handle Array payload
     if (Array.isArray(req.body)) {
       const results = [];
-      for (const item of req.body) {
+      for (const rawItem of req.body) {
+        const item = { ...rawItem };
         if (!item.sheet) item.sheet = DEFAULT_SHEET;
+        if (item.createdAt) item.createdAt = new Date(item.createdAt);
 
         if (item.overrideDbId) {
           const { overrideDbId, ...updateData } = item;
           const updated = await Transaction.findByIdAndUpdate(overrideDbId, updateData, { new: true, upsert: true });
           results.push(updated);
         } else if (item.localId) {
-          // Idempotency: Jika transaksi dengan localId ini sudah ada di MongoDB, jangan buat duplikat!
+          // Idempotency: Jika transaksi dengan localId ini sudah ada di MongoDB, update jika ada perubahan, jangan buat duplikat!
           const existing = await Transaction.findOne({ localId: item.localId });
           if (existing) {
             results.push(existing);
@@ -74,6 +76,7 @@ router.post('/', async (req, res) => {
     if (req.body.overrideDbId) {
       const { overrideDbId, ...updateData } = req.body;
       if (!updateData.sheet) updateData.sheet = DEFAULT_SHEET;
+      if (updateData.createdAt) updateData.createdAt = new Date(updateData.createdAt);
       const updated = await Transaction.findByIdAndUpdate(overrideDbId, updateData, { new: true, upsert: true });
       return res.status(200).json({ status: 'success', data: updated });
     }
@@ -89,6 +92,7 @@ router.post('/', async (req, res) => {
     // D. Standard Single Create
     const txData = { ...req.body };
     if (!txData.sheet) txData.sheet = DEFAULT_SHEET;
+    if (txData.createdAt) txData.createdAt = new Date(txData.createdAt);
     const newTransaction = new Transaction(txData);
     await newTransaction.save();
     res.status(201).json({ status: 'success', data: newTransaction });

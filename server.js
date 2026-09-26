@@ -15,6 +15,7 @@ const emergencyRouter = require('./routes/emergency');
 const menuRouter = require('./routes/menu');
 const activitiesRouter = require('./routes/activities');
 const settingsRouter = require('./routes/settings');
+const dailyStocksRouter = require('./routes/dailyStocks');
 
 const app = express();
 
@@ -67,6 +68,7 @@ app.use('/api/emergency', emergencyRouter);
 app.use('/api/menu', menuRouter);
 app.use('/api/activities', activitiesRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/daily-stocks', dailyStocksRouter);
 
 // 404 Handler for Undefined Routes
 app.use((req, res) => {

@@ -61,12 +61,19 @@ const transactionSchema = new mongoose.Schema({
     index: true,
     sparse: true
   },
-  deviceId: {
-    type: String,
-    default: null
+  items: [{
+    menuId: { type: String },
+    name: { type: String },
+    qty: { type: Number, default: 1 },
+    price: { type: Number, default: 0 }
+  }],
+  createdAt: { 
+    type: Date, 
+    default: Date.now,
+    index: true 
   }
 }, { 
-  timestamps: true 
+  timestamps: { createdAt: false, updatedAt: true } 
 });
 
 transactionSchema.index({ sheet: 1, tanggal: 1, isDeleted: 1 });
