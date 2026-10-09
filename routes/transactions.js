@@ -10,6 +10,9 @@ const Transaction = require('../models/Transaction');
 const DEFAULT_SHEET = process.env.DEFAULT_SHEET || 'PLCI Kantin SMB';
 
 // 1. GET ALL TRANSACTIONS
+// FIX KRITIS: isDeleted=false filter aktif by default — data tidak hilang, tidak ada ghost document
+// FIX KRITIS: sort descending (terbaru duluan) — data hari ini tidak terpotong oleh limit
+// FIX KRITIS: limit ditingkatkan ke 10000 — menghindari data terpotong pada histori panjang
 router.get('/', async (req, res) => {
   try {
     const { sheet, tanggal, includeDeleted } = req.query;
@@ -21,14 +24,15 @@ router.get('/', async (req, res) => {
       filter.tanggal = tanggal;
     }
 
+    // WAJIB: Filter isDeleted secara eksplisit — jika tidak, dokumen soft-deleted bisa lolos
     if (includeDeleted !== 'true') {
-      // By default, only return active or non-deleted, or allow all if requested
-      // For admin history, we include both but frontend flags isDeleted
+      filter.isDeleted = { $ne: true }; // Hanya ambil dokumen yang belum dihapus
     }
 
-    const query = Transaction.find(filter).sort({ createdAt: 1 });
-    if (tanggal) query.limit(500);
-    else query.limit(2000);
+    // Sort descending: data terbaru (hari ini) selalu ada di atas, tidak terpotong oleh limit
+    const query = Transaction.find(filter).sort({ createdAt: -1 });
+    if (tanggal) query.limit(1000);       // Per hari: cukup 1000 transaksi
+    else query.limit(10000);              // Seluruh histori: ditingkatkan ke 10000
 
     const data = await query.exec();
     res.status(200).json(data);

@@ -110,8 +110,7 @@ router.post('/trigger', async (req, res) => {
           tanggal: dateIndoStr,
           cash: 0,
           bca: 0,
-          gofood: 0,
-          qris: 0,
+          qris: 0,                             // gofood dihapus, hanya cash/bca/qris
           jenisPengeluaran: `[OPERASIONAL ROUTINE] ${rule.nama}`,
           totalPengeluaran: rule.nominal,
           totalPendapatan: 0
