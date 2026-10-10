@@ -53,6 +53,21 @@ router.post('/', async (req, res) => {
         if (!item.sheet) item.sheet = DEFAULT_SHEET;
         if (item.createdAt) item.createdAt = new Date(item.createdAt);
 
+        // FIX KRITIS SINKRONISASI DATABASE:
+        // Jika transaksi berstatus isDeleted (dibatalkan/dihapus oleh kasir):
+        // HAPUS PERMANEN dari MongoDB jika sudah ada, dan JANGAN PERNAH simpan sebagai dokumen baru!
+        if (item.isDeleted) {
+          if (item.localId || item.overrideDbId) {
+            await Transaction.deleteMany({
+              $or: [
+                ...(item.localId ? [{ localId: item.localId }] : []),
+                ...(item.overrideDbId ? [{ _id: item.overrideDbId }] : [])
+              ]
+            });
+          }
+          continue;
+        }
+
         if (item.overrideDbId) {
           const { overrideDbId, ...updateData } = item;
           const updated = await Transaction.findByIdAndUpdate(overrideDbId, updateData, { new: true, upsert: true });
@@ -76,7 +91,20 @@ router.post('/', async (req, res) => {
       return res.status(201).json({ status: 'success', data: results });
     }
 
-    // B. Handle Single with overrideDbId
+    // B. Handle Single with isDeleted (Batalkan/Hapus permanen)
+    if (req.body.isDeleted) {
+      if (req.body.localId || req.body.overrideDbId) {
+        await Transaction.deleteMany({
+          $or: [
+            ...(req.body.localId ? [{ localId: req.body.localId }] : []),
+            ...(req.body.overrideDbId ? [{ _id: req.body.overrideDbId }] : [])
+          ]
+        });
+      }
+      return res.status(200).json({ status: 'success', message: 'Transaksi yang dibatalkan telah dihapus permanen dari database' });
+    }
+
+    // C. Handle Single with overrideDbId
     if (req.body.overrideDbId) {
       const { overrideDbId, ...updateData } = req.body;
       if (!updateData.sheet) updateData.sheet = DEFAULT_SHEET;
@@ -85,7 +113,7 @@ router.post('/', async (req, res) => {
       return res.status(200).json({ status: 'success', data: updated });
     }
 
-    // C. Handle Single with localId (Idempotent Check)
+    // D. Handle Single with localId (Idempotent Check)
     if (req.body.localId) {
       const existing = await Transaction.findOne({ localId: req.body.localId });
       if (existing) {
@@ -93,7 +121,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // D. Standard Single Create
+    // E. Standard Single Create
     const txData = { ...req.body };
     if (!txData.sheet) txData.sheet = DEFAULT_SHEET;
     if (txData.createdAt) txData.createdAt = new Date(txData.createdAt);
